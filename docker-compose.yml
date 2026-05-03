@@ -1,0 +1,56 @@
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: todo-db
+    restart: always
+    environment:
+      POSTGRES_USER: user_todo
+      POSTGRES_PASSWORD: password_todo
+      POSTGRES_DB: db_todo
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - todo-network
+
+  backend:
+    build: ./backend
+    container_name: todo-backend
+    restart: on-failure
+    ports:
+      - "3000:3000"
+    environment:
+      - DB_HOST=db
+      - DB_PORT=5432
+      - DB_USER=user_todo
+      - DB_PASSWORD=password_todo
+      - DB_NAME=db_todo
+      - PORT=3000
+      - APP_ENV=development
+    depends_on:
+      - db
+    networks:
+      - todo-network
+
+  frontend:
+    build: ./frontend
+    container_name: todo-frontend
+    ports:
+      - "5173:5173"
+    environment:
+      - VITE_API_URL=http://localhost:3000/api
+    depends_on:
+      - backend
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    networks:
+      - todo-network
+
+networks:
+  todo-network:
+    driver: bridge
+
+volumes:
+  postgres_data:

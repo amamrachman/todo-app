@@ -21,7 +21,7 @@ const TodoList: React.FC = () => {
 
   const observerRef = useRef<IntersectionObserver | null>(null);
   const lastTodoRef = useRef<HTMLDivElement>(null);
-  
+
   const abortControllerRef = useRef<AbortController | null>(null);
 
   const fetchTodos = useCallback(async (pageNum: number) => {
@@ -36,15 +36,24 @@ const TodoList: React.FC = () => {
       const response = await todoApi.getAll(pageNum, 20);
 
       setTodos((prev) =>
-        pageNum === 1 ? response.data : [...prev, ...response.data],
+        pageNum === 1
+          ? response.data.filter(
+              (t: Todo) => t && Number.isFinite(t.id) && t.id > 0,
+            )
+          : [
+              ...prev,
+              ...response.data.filter(
+                (t: Todo) => t && Number.isFinite(t.id) && t.id > 0,
+              ),
+            ],
       );
 
       setHasMore(response.data.length === 20);
       setError(null);
     } catch (err) {
       const error = err as { name?: string; message?: string };
-      
-      if (error.name !== 'CanceledError' && error.message !== 'canceled') {
+
+      if (error.name !== "CanceledError" && error.message !== "canceled") {
         setError("Failed to fetch todos");
         console.error(err);
       }
@@ -55,7 +64,7 @@ const TodoList: React.FC = () => {
 
   useEffect(() => {
     fetchTodos(1);
-    
+
     return () => {
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
@@ -76,14 +85,17 @@ const TodoList: React.FC = () => {
       observerRef.current.disconnect();
     }
 
-    observerRef.current = new IntersectionObserver((entries) => {
-      const firstEntry = entries[0];
-      if (firstEntry?.isIntersecting && hasMore && !loading) {
-        setPage((prev) => prev + 1);
-      }
-    }, {
-      rootMargin: '100px',
-    });
+    observerRef.current = new IntersectionObserver(
+      (entries) => {
+        const firstEntry = entries[0];
+        if (firstEntry?.isIntersecting && hasMore && !loading) {
+          setPage((prev) => prev + 1);
+        }
+      },
+      {
+        rootMargin: "100px",
+      },
+    );
 
     if (lastTodoRef.current) {
       observerRef.current.observe(lastTodoRef.current);
@@ -95,7 +107,9 @@ const TodoList: React.FC = () => {
   const handleAddTodo = useCallback(async (title: string) => {
     try {
       const newTodo = await todoApi.create({ title });
-      setTodos((prev) => [newTodo, ...prev]);
+      setTodos((prev) =>
+        [newTodo, ...prev].filter((t) => Number.isFinite(t.id) && t.id > 0),
+      );
     } catch (err) {
       setError("Failed to add todo");
       console.error(err);
@@ -104,6 +118,12 @@ const TodoList: React.FC = () => {
 
   const handleToggleTodo = useCallback(
     async (id: number, completed: boolean) => {
+      console.log("Calling toggle on ID:", id, "completed:", completed);
+      if (!Number.isFinite(id) || id <= 0) {
+        console.error("Invalid toggle ID:", id);
+        setError("Invalid todo ID for toggle");
+        return;
+      }
       try {
         const updatedTodo = await todoApi.update(id, { completed });
         setTodos((prev) =>
@@ -118,6 +138,11 @@ const TodoList: React.FC = () => {
   );
 
   const handleUpdateTodo = useCallback(async (id: number, title: string) => {
+    if (!Number.isFinite(id) || id <= 0) {
+      console.error("Invalid update ID:", id);
+      setError("Invalid todo ID for update");
+      return;
+    }
     try {
       const updatedTodo = await todoApi.update(id, { title });
       setTodos((prev) =>
@@ -130,6 +155,11 @@ const TodoList: React.FC = () => {
   }, []);
 
   const handleDeleteTodo = useCallback(async (id: number) => {
+    if (!Number.isFinite(id) || id <= 0) {
+      console.error("Invalid delete ID:", id);
+      setError("Invalid todo ID for delete");
+      return;
+    }
     try {
       await todoApi.delete(id);
       setTodos((prev) => prev.filter((todo) => todo.id !== id));
@@ -140,14 +170,19 @@ const TodoList: React.FC = () => {
   }, []);
 
   const filteredTodos = useMemo(() => {
+    let result = todos;
     switch (filter) {
       case "active":
-        return todos.filter((todo) => !todo.completed);
+        result = todos.filter((todo) => !todo.completed);
+        break;
       case "completed":
-        return todos.filter((todo) => todo.completed);
+        result = todos.filter((todo) => todo.completed);
+        break;
       default:
-        return todos;
+        result = todos;
+        break;
     }
+    return result.filter((todo) => Number.isFinite(todo.id) && todo.id > 0);
   }, [todos, filter]);
 
   if (loading && page === 1) {
@@ -196,7 +231,7 @@ const TodoList: React.FC = () => {
           Completed
         </button>
       </div>
-      
+
       {filteredTodos.length === 0 ? (
         <p className="text-center text-gray-500 py-8">No todos found.</p>
       ) : (

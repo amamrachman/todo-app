@@ -96,6 +96,10 @@ export const todoApi = {
   },
 
   getById: async (id: number): Promise<Todo> => {
+    if (!Number.isFinite(id) || id <= 0) {
+      console.warn("Invalid ID in getById:", id);
+      throw new Error("Invalid todo ID");
+    }
     const cacheKey = `todo-${id}`;
     const cached = cache.get(cacheKey);
 
@@ -110,8 +114,7 @@ export const todoApi = {
 
   create: async (todo: TodoCreate): Promise<Todo> => {
     const response = await api.post("/todos", todo);
-
-    cache.invalidate("todos-1-10");
+    cache.clear();
     return response.data;
   },
 
@@ -124,19 +127,27 @@ export const todoApi = {
   },
 
   update: async (id: number, todo: TodoUpdate): Promise<Todo> => {
+    if (!Number.isFinite(id) || id <= 0) {
+      console.warn("Invalid ID in update:", id);
+      throw new Error("Invalid todo ID");
+    }
     const response = await api.put(`/todos/${id}`, todo);
 
     cache.invalidate(`todo-${id}`);
-    cache.invalidate("todos-1-10");
+    cache.clear();
     return response.data;
   },
 
   delete: async (id: number, permanent = false): Promise<void> => {
+    if (!Number.isFinite(id) || id <= 0) {
+      console.warn("Invalid ID in delete:", id);
+      throw new Error("Invalid todo ID");
+    }
     await api.delete(`/todos/${id}`, {
       params: { permanent },
     });
 
     cache.invalidate(`todo-${id}`);
-    cache.invalidate("todos-1-10");
+    cache.clear();
   },
 };

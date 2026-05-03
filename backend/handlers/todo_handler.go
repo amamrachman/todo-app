@@ -158,54 +158,36 @@ func CreateTodo(c fiber.Ctx) error {
 
 func UpdateTodo(c fiber.Ctx) error {
 	id := c.Params("id")
+	var todo models.Todo
 
-	updates := make(map[string]interface{})
-
-	if err := c.Bind().Body(&updates); err != nil {
-		return c.Status(400).JSON(fiber.Map{
-			"error": "Invalid request body",
-		})
+	if err := config.DB.First(&todo, id).Error; err != nil {
+		return c.Status(404).JSON(fiber.Map{"error": "Todo tidak ditemukan"})
 	}
 
-	allowedUpdates := map[string]bool{
-		"title":     true,
-		"completed": true,
+	type UpdateInput struct {
+		Title     *string `json:"title"`
+		Completed *bool   `json:"completed"`
 	}
 
-	updateData := make(map[string]interface{})
-	for key, value := range updates {
-		if allowedUpdates[key] {
-			updateData[key] = value
-		}
+	var input UpdateInput
+	if err := c.Bind().Body(&input); err != nil {
+		return c.Status(400).JSON(fiber.Map{"error": "Format data salah"})
 	}
 
-	if len(updateData) == 0 {
-		return c.Status(400).JSON(fiber.Map{
-			"error": "No valid fields to update",
-		})
+	if input.Title != nil {
+		todo.Title = *input.Title
+	}
+	if input.Completed != nil {
+		todo.Completed = *input.Completed
 	}
 
-	result := config.DB.Model(&models.Todo{}).
-		Where("id = ?", id).
-		Updates(updateData)
-
-	if result.Error != nil {
-		return c.Status(500).JSON(fiber.Map{
-			"error": "Failed to update todo",
-		})
-	}
-
-	if result.RowsAffected == 0 {
-		return c.Status(404).JSON(fiber.Map{
-			"error": "Todo not found",
-		})
+	if err := config.DB.Save(&todo).Error; err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "Gagal update ke database"})
 	}
 
 	deleteFromCache("todo_" + id)
 
-	return c.JSON(fiber.Map{
-		"message": "Todo updated successfully",
-	})
+	return c.Status(200).JSON(todo)
 }
 
 func DeleteTodo(c fiber.Ctx) error {

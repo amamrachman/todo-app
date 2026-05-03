@@ -36,6 +36,11 @@ const TodoItem: React.FC<TodoItemProps> = memo(
       }
     }, [todo.id, onDelete]);
 
+    if (!Number.isFinite(todo.id) || todo.id <= 0) {
+      console.warn("TodoItem skipped - invalid ID:", todo.id);
+      return null;
+    }
+
     return (
       <div className="flex items-center gap-3 p-3 bg-white border border-gray-200 rounded-lg hover:shadow-sm transition-shadow will-change-transform">
         <input
